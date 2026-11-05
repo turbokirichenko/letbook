@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NOTEBOOK / подбор</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #10110f;
+      --panel: #171915;
+      --line: #363a32;
+      --text: #e4e8dc;
+      --muted: #92998b;
+      --accent: #bdff67;
+      --warn: #ffc46b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    main {
+      width: min(900px, 100%);
+      margin: 0 auto;
+      padding: 38px 22px 60px;
+    }
+
+    .eyebrow, .hint { color: var(--muted); }
+    .eyebrow { letter-spacing: .12em; font-size: 11px; }
+    h1 { font-size: clamp(25px, 5vw, 38px); margin: 8px 0; }
+    h2 { font-size: 16px; margin: 0 0 17px; }
+    p { color: var(--muted); }
+
+    .panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 20px;
+      margin-top: 18px;
+    }
+
+    .budget-row {
+      display: grid;
+      grid-template-columns: 1fr 180px;
+      gap: 18px;
+      align-items: end;
+    }
+
+    label { display: block; }
+
+    input[type="number"] {
+      width: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--line);
+      padding: 11px;
+      font: inherit;
+      margin-top: 7px;
+    }
+
+    .brands {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+    }
+
+    .brands label, .checkline {
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      color: var(--text);
+    }
+
+    input[type="checkbox"], input[type="range"] { accent-color: var(--accent); }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: minmax(190px, 1fr) 2fr 36px;
+      gap: 12px;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    .slider-row:last-child { border-bottom: 0; }
+    input[type="range"] { width: 100%; }
+    output { color: var(--accent); text-align: right; }
+
+    button {
+      background: var(--accent);
+      color: #111;
+      border: 0;
+      padding: 12px 18px;
+      margin-top: 18px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover { filter: brightness(.92); }
+    .hint { font-size: 12px; margin-top: 12px; }
+
+    .result {
+      border-top: 1px solid var(--line);
+      padding: 16px 0;
+    }
+
+    .result:first-child { border-top: 0; }
+
+    .result-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+    }
+
+    .result h3 { font-size: 15px; margin: 0; }
+    .score { color: var(--accent); white-space: nowrap; }
+    .bar { height: 5px; background: #30342c; margin: 10px 0; }
+    .bar > i { display: block; height: 100%; background: var(--accent); }
+    .specs { color: var(--muted); font-size: 12px; }
+    .price { color: var(--warn); }
+    .empty { color: var(--warn); }
+    .hidden { display: none; }
+
+    @media (max-width: 600px) {
+      main { padding: 24px 15px 40px; }
+      .budget-row { grid-template-columns: 1fr; }
+      .slider-row { grid-template-columns: 1fr 34px; }
+      .slider-row input { grid-column: 1 / -1; grid-row: 2; }
+      .slider-row output { grid-column: 2; grid-row: 1; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">PERSONAL HARDWARE SELECTOR / RU</div>
+  <h1>Выбор ноутбука</h1>
+  <p>Модели 2024–2026 годов · бюджет 40 000–120 000 ₽.</p>
+
+  <form id="picker">
+    <section class="panel">
+      <h2>01 / бюджет и бренды</h2>
+      <div class="budget-row">
+        <label>
+          Бюджет, ₽
+          <input id="budget" type="number" min="40000" max="120000"
+                 step="1000" value="90000" required>
+        </label>
+        <label class="checkline">
+          <input id="anyBrand" type="checkbox" checked>
+          Любой бренд
+        </label>
+      </div>
+      <p class="hint">Снимите «Любой бренд», чтобы выбрать бренды вручную.</p>
+      <div class="brands" id="brands"></div>
+    </section>
+
+    <section class="panel">
+      <h2>02 / важность критериев · 0—10</h2>
+      <div id="sliders"></div>
+    </section>
+
+    <button type="submit">Рассчитать подбор →</button>
+  </form>
+
+  <section class="panel hidden" id="resultsPanel">
+    <h2>03 / подходящие варианты</h2>
+    <div id="results"></div>
+  </section>
+
+  <p class="hint">
+    Цены и оценки — демонстрационные ориентиры, не актуальные предложения магазинов.
+    MacBook Air в списке обозначены как новые устройства; перед покупкой проверьте
+    наличие нужной конфигурации и цену. Оценки характеристик примерные.
+  </p>
+</main>
+
+<script>
+  // Примерные цены в рублях. Перед покупкой замените на цены конкретного продавца.
+  // Все устройства в каталоге указаны в диапазоне 40 000–120 000 ₽.
+  const laptops = [
+    {
+      name: "MacBook Neo 13 (2026, 256 ГБ)",
+      year: 2026, brand: "Apple", price: 79990,
+      cpu: "Apple A18 Pro", ram: 8,
+      battery: 8.5, gaming: 5.0, multitask: 5.5, ai: 7.0, build: 8.7,
+      glass: true, screen: "Liquid Retina, 13″, глянцевый"
+    },
+    {
+      name: "MacBook Neo 13 (2026, 512 ГБ)",
+      year: 2026, brand: "Apple", price: 94990,
+      cpu: "Apple A18 Pro", ram: 8,
+      battery: 8.5, gaming: 5.0, multitask: 5.5, ai: 7.0, build: 8.7,
+      glass: true, screen: "Liquid Retina, 13″, глянцевый"
+    },
+    {
+      name: "MacBook Air 13 M3 (2024, 8 ГБ)",
+      year: 2024, brand: "Apple", price: 99990,
+      cpu: "Apple M3", ram: 8,
+      battery: 9.2, gaming: 6.0, multitask: 6.5, ai: 8.2, build: 9.3,
+      glass: true, screen: "Liquid Retina, 13.6″, глянцевый"
+    },
+    {
+      name: "MacBook Air 13 M3 (2024, 16 ГБ)",
+      year: 2024, brand: "Apple", price: 119990,
+      cpu: "Apple M3", ram: 16,
+      battery: 9.2, gaming: 6.0, multitask: 8.0, ai: 8.2, build: 9.3,
+      glass: true, screen: "Liquid Retina, 13.6″, глянцевый"
+    },
+    {
+      name: "MacBook Air 13 M4 (2025, 16 ГБ)",
+      year: 2025, brand: "Apple", price: 119990,
+      cpu: "Apple M4", ram: 16,
+      battery: 9.3, gaming: 6.5, multitask: 8.5, ai: 8.8, build: 9.3,
+      glass: true, screen: "Liquid Retina, 13.6″, глянцевый"
+    },
+    {
+      name: "ASUS Vivobook S15 OLED",
+      year: 2024, brand: "ASUS", price: 78000,
+      cpu: "Snapdragon X Plus", ram: 16,
+      battery: 8.5, gaming: 5.0, multitask: 7.5, ai: 8.5, build: 8.0,
+      glass: true, screen: "OLED, 15.6″, глянцевый"
+    },
+    {
+      name: "ASUS Zenbook 14 OLED",
+      year: 2025, brand: "ASUS", price: 105000,
+      cpu: "AMD Ryzen AI", ram: 16,
+      battery: 8.0, gaming: 5.8, multitask: 8.0, ai: 8.0, build: 8.8,
+      glass: true, screen: "OLED, 14″, глянцевый"
+    },
+    {
+      name: "Lenovo IdeaPad Slim 5 14",
+      year: 2024, brand: "Lenovo", price: 72000,
+      cpu: "AMD Ryzen 7", ram: 16,
+      battery: 7.8, gaming: 6.0, multitask: 7.8, ai: 6.5, build: 7.8,
+      glass: false, screen: "IPS, 14″, матовый"
+    },
+    {
+      name: "Lenovo ThinkBook 14 G7",
+      year: 2024, brand: "Lenovo", price: 85000,
+      cpu: "AMD Ryzen 7", ram: 16,
+      battery: 7.5, gaming: 6.2, multitask: 8.0, ai: 6.5, build: 8.0,
+      glass: false, screen: "IPS, 14″, матовый"
+    },
+    {
+      name: "Acer Swift Go 14 OLED",
+      year: 2024, brand: "Acer", price: 88000,
+      cpu: "Intel Core Ultra 5", ram: 16,
+      battery: 7.8, gaming: 5.8, multitask: 7.8, ai: 7.5, build: 8.2,
+      glass: true, screen: "OLED, 14″, глянцевый"
+    },
+    {
+      name: "Huawei MateBook 14",
+      year: 2024, brand: "Huawei", price: 82000,
+      cpu: "Intel Core Ultra 5", ram: 16,
+      battery: 7.8, gaming: 5.5, multitask: 7.8, ai: 7.0, build: 8.7,
+      glass: true, screen: "OLED, 14.2″, сенсорный, глянцевый"
+    },
+    {
+      name: "Xiaomi RedmiBook 16",
+      year: 2025, brand: "Xiaomi", price: 74000,
+      cpu: "Intel Core Ultra 5", ram: 16,
+      battery: 7.5, gaming: 6.0, multitask: 7.8, ai: 7.0, build: 7.5,
+      glass: false, screen: "IPS, 16″, матовый"
+    },
+    {
+      name: "HP OmniBook X Flip 14",
+      year: 2025, brand: "HP", price: 115000,
+      cpu: "Intel Core Ultra 5", ram: 16,
+      battery: 7.8, gaming: 5.5, multitask: 7.8, ai: 8.0, build: 8.5,
+      glass: true, screen: "OLED, 14″, сенсорный, глянцевый"
+    },
+    {
+      name: "HONOR MagicBook X14 Plus",
+      year: 2025, brand: "HONOR", price: 68000,
+      cpu: "Intel Core Ultra 5", ram: 16,
+      battery: 7.5, gaming: 5.4, multitask: 7.5, ai: 7.0, build: 7.8,
+      glass: false, screen: "IPS, 14″, матовый"
+    },
+    {
+      name: "ASUS Vivobook 14",
+      year: 2026, brand: "ASUS", price: 79000,
+      cpu: "AMD Ryzen AI 5", ram: 16,
+      battery: 7.8, gaming: 6.0, multitask: 7.8, ai: 7.8, build: 7.8,
+      glass: false, screen: "IPS, 14″, матовый"
+    }
+  ];
+
+  const criteria = [
+    { key: "battery", label: "Автономность в кафешке", curve: "square" },
+    { key: "gaming", label: "Небольшие игры", curve: "log" },
+    { key: "multitask", label: "100 вкладок без лагов", curve: "square" },
+    { key: "ai", label: "Удобство работы с ИИ", curve: "log" },
+    { key: "build", label: "Внешний вид и сборка", curve: "log" }
+  ];
+
+  const brandContainer = document.getElementById("brands");
+
+  [...new Set(laptops.map(laptop => laptop.brand))].forEach(brand => {
+    const label = document.createElement("label");
+    label.innerHTML =
+      `<input type="checkbox" name="brand" value="${brand}"> ${brand}`;
+    brandContainer.appendChild(label);
+  });
+
+  const sliderContainer = document.getElementById("sliders");
+
+  criteria.forEach(criterion => {
+    const row = document.createElement("label");
+    row.className = "slider-row";
+    row.innerHTML = `
+      <span>${criterion.label}</span>
+      <input type="range" min="0" max="10" value="5"
+             name="${criterion.key}">
+      <output>5</output>`;
+
+    const input = row.querySelector("input");
+    input.addEventListener("input", () => {
+      row.querySelector("output").value = input.value;
+    });
+
+    sliderContainer.appendChild(row);
+  });
+
+  const anyBrand = document.getElementById("anyBrand");
+
+  function updateBrandInputs() {
+    document.querySelectorAll('input[name="brand"]').forEach(input => {
+      input.disabled = anyBrand.checked;
+      if (anyBrand.checked) input.checked = false;
+    });
+  }
+
+  anyBrand.addEventListener("change", updateBrandInputs);
+  updateBrandInputs();
+
+  function utility(value, curve) {
+    const x = Math.max(0, Math.min(1, value / 10));
+    if (curve === "square") return x * x;
+    return Math.log1p(9 * x) / Math.log(10);
+  }
+
+  document.getElementById("picker").addEventListener("submit", event => {
+    event.preventDefault();
+
+    const budgetInput = document.getElementById("budget");
+    const budget = Number(budgetInput.value);
+
+    if (!budget || budget < 40000 || budget > 120000) {
+      budgetInput.setCustomValidity("Введите бюджет от 40 000 до 120 000 ₽.");
+      budgetInput.reportValidity();
+      return;
+    }
+
+    budgetInput.setCustomValidity("");
+
+    const selectedBrands = [
+      ...document.querySelectorAll('input[name="brand"]:checked')
+    ].map(input => input.value);
+
+    const formData = new FormData(event.currentTarget);
+
+    const weights = criteria.map(criterion => ({
+      ...criterion,
+      weight: Number(formData.get(criterion.key) || 0)
+    }));
+
+    const totalWeight = weights.reduce(
+      (sum, criterion) => sum + criterion.weight, 0
+    );
+
+    const filtered = laptops
+      .filter(laptop =>
+        laptop.price >= 40000 &&
+        laptop.price <= 120000 &&
+        (anyBrand.checked || selectedBrands.includes(laptop.brand))
+      )
+      .map(laptop => {
+        const weightedScore = totalWeight
+          ? weights.reduce(
+              (sum, criterion) =>
+                sum +
+                utility(laptop[criterion.key], criterion.curve) *
+                criterion.weight,
+              0
+            ) / totalWeight
+          : 0;
+
+        // В бюджете множитель равен 1. Выше бюджета рейтинг линейно снижается.
+        const budgetFactor = laptop.price <= budget
+          ? 1
+          : Math.max(0, 1 - (laptop.price - budget) / budget);
+
+        return {
+          ...laptop,
+          score: weightedScore * budgetFactor * 100
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    const resultsPanel = document.getElementById("resultsPanel");
+    const results = document.getElementById("results");
+
+    resultsPanel.classList.remove("hidden");
+
+    if (!filtered.length) {
+      results.innerHTML =
+        '<p class="empty">Выберите бренд или включите «Любой бренд».</p>';
+      return;
+    }
+
+    results.innerHTML = filtered.map((laptop, index) => `
+      <article class="result">
+        <div class="result-head">
+          <h3>${String(index + 1).padStart(2, "0")} / ${laptop.name}</h3>
+          <span class="score">${laptop.score.toFixed(1)} балла</span>
+        </div>
+        <div class="bar">
+          <i style="width:${Math.max(0, Math.min(100, laptop.score))}%"></i>
+        </div>
+        <div class="specs">
+          ${laptop.year} · ${laptop.brand} ·
+          <span class="price">${laptop.price.toLocaleString("ru-RU")} ₽</span>
+          · ${laptop.cpu} · ${laptop.ram} ГБ RAM · ${laptop.screen}
+          · сборка ${laptop.build}/10
+          · ${laptop.glass ? "глянцевое покрытие" : "матовое покрытие"}
+          · ${laptop.price > budget ? "выше бюджета" : "в бюджете"}
+        </div>
+      </article>
+    `).join("");
+
+    resultsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+</script>
+</body>
+</html>
